@@ -103,99 +103,6 @@ body {
 .section { display: none; }
 .section.active { display: block; }
 
-/* ===== OCR Area ===== */
-.ocr-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: var(--radius);
-  padding: 20px 16px;
-  margin-bottom: 12px;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(102,126,234,.2);
-  position: relative;
-}
-.ocr-icon { font-size: 28px; margin-bottom: 6px; }
-.ocr-title { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
-.ocr-hint { font-size: 11px; opacity: .75; }
-
-.ocr-actions-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
-.ocr-action-btn {
-  flex: 1;
-  padding: 12px 8px;
-  border-radius: 10px;
-  border: 1.5px dashed rgba(255,255,255,.5);
-  background: rgba(255,255,255,.1);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  text-align: center;
-  font-family: inherit;
-  transition: all .15s;
-}
-.ocr-action-btn:active {
-  background: rgba(255,255,255,.25);
-  border-color: rgba(255,255,255,.8);
-  transform: scale(.97);
-}
-
-.ocr-processing {
-  text-align: center;
-  padding: 20px 0;
-}
-.ocr-processing .spinner {
-  display: inline-block;
-  width: 32px; height: 32px;
-  border: 3px solid rgba(255,255,255,.25);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin .8s linear infinite;
-  margin-bottom: 10px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.ocr-processing .proc-text { font-size: 13px; opacity: .85; }
-
-.ocr-result {
-  background: rgba(255,255,255,.15);
-  border-radius: 8px;
-  padding: 14px;
-  margin-top: 12px;
-  display: none;
-  animation: fadeIn .3s;
-}
-@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-.ocr-result .ocr-amount {
-  font-size: 30px;
-  font-weight: 700;
-  margin-bottom: 2px;
-}
-.ocr-result .ocr-merchant { font-size: 14px; opacity: .85; margin-bottom: 6px; }
-.ocr-result .ocr-raw {
-  font-size: 11px;
-  opacity: .55;
-  max-height: 50px;
-  overflow-y: auto;
-  margin-bottom: 10px;
-  line-height: 1.5;
-  word-break: break-all;
-}
-.ocr-actions { display: flex; gap: 8px; }
-.ocr-actions .btn { flex: 1; }
-.btn-ocr-confirm { background: #fff; color: #667eea; }
-.btn-ocr-confirm:active { opacity: .85; }
-.btn-ocr-retry { background: rgba(255,255,255,.2); color: #fff; }
-.btn-ocr-retry:active { background: rgba(255,255,255,.35); }
-
-#paste-input {
-  position: fixed;
-  left: -9999px;
-  opacity: 0;
-  width: 1px;
-  height: 1px;
-}
 
 /* ===== Form ===== */
 .form-card {
@@ -369,25 +276,6 @@ tr:active td { background: #f5f5f5; }
   flex-wrap: wrap;
 }
 
-/* Toast */
-.toast {
-  position: fixed;
-  bottom: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0,0,0,.8);
-  color: #fff;
-  padding: 10px 22px;
-  border-radius: 20px;
-  font-size: 13px;
-  z-index: 9999;
-  animation: toastIn .25s, toastOut .25s 2s forwards;
-  pointer-events: none;
-  white-space: nowrap;
-}
-@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-@keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
-
 /* File input hidden */
 #file-input { display: none; }
 </style>
@@ -422,36 +310,6 @@ tr:active td { background: #f5f5f5; }
 
   <!-- Section: 记一笔 -->
   <div class="section active" id="sec-add">
-
-    <!-- OCR 截图识别 -->
-    <div class="ocr-card" id="ocr-card">
-      <div class="ocr-icon">📸</div>
-      <div class="ocr-title">截图识别记账</div>
-      <div class="ocr-hint">识别微信/支付宝/银行支付截图</div>
-      <div class="ocr-actions-row" id="ocr-buttons">
-        <button class="ocr-action-btn" id="btn-paste">
-          📋 长按粘贴截图
-        </button>
-        <button class="ocr-action-btn" id="btn-gallery">
-          🖼️ 从相册选择
-        </button>
-      </div>
-      <input type="text" id="paste-input" autocomplete="off" placeholder="">
-      <input type="file" id="file-input" accept="image/*">
-      <div class="ocr-processing" id="ocr-processing" style="display:none">
-        <div class="spinner"></div>
-        <div class="proc-text">正在识别中...</div>
-      </div>
-      <div class="ocr-result" id="ocr-result">
-        <div class="ocr-amount" id="ocr-amount"></div>
-        <div class="ocr-merchant" id="ocr-merchant"></div>
-        <div class="ocr-raw" id="ocr-raw"></div>
-        <div class="ocr-actions">
-          <button class="btn btn-ocr-retry" onclick="resetOCR()">重新识别</button>
-          <button class="btn btn-ocr-confirm" id="btn-ocr-confirm">✓ 确认记账</button>
-        </div>
-      </div>
-    </div>
 
     <!-- 手动输入 -->
     <div class="form-card">
@@ -572,19 +430,6 @@ tr:active td { background: #f5f5f5; }
 </div>
 
 <script>
-// ===== Tesseract.js 动态加载 =====
-let Tesseract = null;
-function loadTesseract() {
-  return new Promise((resolve, reject) => {
-    if (Tesseract) return resolve(Tesseract);
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-    script.onload = () => { Tesseract = window.Tesseract; resolve(Tesseract); };
-    script.onerror = () => reject(new Error('Tesseract.js 加载失败，请检查网络连接'));
-    document.head.appendChild(script);
-  });
-}
-
 // ===== Chart.js 动态加载 =====
 let Chart = null;
 function loadChart() {
@@ -620,145 +465,6 @@ function getThisMonth() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
 }
-function showToast(msg) {
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2300);
-}
-
-// ===== OCR =====
-let ocrParsedData = null;
-let ocrWorker = null;
-
-async function getOCRWorker() {
-  if (ocrWorker) return ocrWorker;
-  await loadTesseract();
-  showToast('正在加载识别引擎…');
-  ocrWorker = await Tesseract.createWorker('chi_sim+eng', 1, {
-    logger: (m) => {
-      if (m.status === 'recognizing text') {
-        const el = document.getElementById('ocr-processing');
-        if (el && el.style.display !== 'none') {
-          el.innerHTML = `<div class="spinner"></div><div class="proc-text">识别中 ${Math.round(m.progress*100)}%</div>`;
-        }
-      }
-    }
-  });
-  return ocrWorker;
-}
-
-function resetOCR() {
-  ocrParsedData = null;
-  document.getElementById('ocr-result').style.display = 'none';
-  document.getElementById('ocr-processing').style.display = 'none';
-  document.getElementById('ocr-buttons').style.display = '';
-}
-
-function parseOCRText(text) {
-  text = text.replace(/[Oo０]/g, '0').replace(/[lIＩ|]/g, '1').replace(/[ＳS]/g, '5').replace(/\s+/g, ' ').trim();
-
-  let amount = null, merchant = '', isExpense = true;
-
-  // Extract amount
-  const amountPatterns = [
-    /[¥￥]\s*(\d+[.,]\d{1,2})/, /[¥￥]\s*(\d+)/,
-    /(?:消费|支出|付款|支付|扣款)[^\d]{0,5}?(\d+[.,]\d{1,2})\s*元/,
-    /(\d+[.,]\d{1,2})\s*元/, /RMB\s*(\d+[.,]\d{1,2})/i,
-    /(?:金额|合计)[^\d]*?(\d+[.,]\d{1,2})/, /(\d+[.,]\d{1,2})/
-  ];
-  for (const pat of amountPatterns) {
-    const m = text.match(pat);
-    if (m) { amount = parseFloat(m[1].replace(',', '.')); if (amount > 0 && amount < 100000) break; amount = null; }
-  }
-
-  // Determine type
-  if (/(?:收款|入账|到账|转入|存入|红包|收入|退款).*?[¥￥]?\d/.test(text)) isExpense = false;
-  if (/(?:消费|支出|付款|支付|扣款|POS)/.test(text)) isExpense = true;
-
-  // Extract merchant
-  const mpats = [
-    /(?:向|付款给|收款方[：:]|商户[名称]?[：:]|收款单位[：:]|对方[：:])\s*([^\s,，。\n]{2,20})/,
-    /([^\s,，。\n]{2,15})(?:店|餐厅|超市|商场|银行|平台|公司|外卖|便利)/,
-    /(?:在)([^\s,，。\n]{2,15})(?:消费|付款|支付)/
-  ];
-  for (const p of mpats) { const m = text.match(p); if (m) { merchant = m[1].trim(); break; } }
-
-  // Guess category
-  let category = '其他支出';
-  if (merchant) {
-    const catMap = {
-      '餐饮': ['餐','饭','面','粉','菜','馆','麻辣','火锅','烧烤','奶茶','咖啡','外卖','美团','饿了吗','饿了么','肯德基','麦当劳','星巴克','茶','饮','小吃','食堂'],
-      '交通': ['滴滴','打车','地铁','公交','加油','高速','停车','ETC','曹操','如祺','T3','花小猪'],
-      '购物': ['淘宝','京东','拼多多','天猫','超市','便利','商场','唯品会','抖音','快手'],
-      '娱乐': ['电影','KTV','游戏','网吧','视频','会员','音乐','演出','门票','旅游','酒店'],
-      '居住': ['房租','水电','物业','燃气','暖气'],
-      '通讯': ['移动','联通','电信','话费','流量'],
-      '医疗': ['医院','药','医','挂号','体检'],
-      '教育': ['书','课程','培训','考试','学费']
-    };
-    for (const [cat, kws] of Object.entries(catMap)) {
-      if (kws.some(k => merchant.includes(k))) { category = cat; break; }
-    }
-  }
-  return { amount, merchant, category, isExpense, rawText: text };
-}
-
-async function processOCRImage(file) {
-  resetOCR();
-  document.getElementById('ocr-buttons').style.display = 'none';
-  const procEl = document.getElementById('ocr-processing');
-  procEl.style.display = '';
-  procEl.innerHTML = '<div class="spinner"></div><div class="proc-text">正在准备识别...</div>';
-
-  try {
-    const worker = await getOCRWorker();
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
-    URL.revokeObjectURL(url);
-
-    const { data: { text } } = await worker.recognize(img);
-    const parsed = parseOCRText(text);
-    ocrParsedData = parsed;
-
-    procEl.style.display = 'none';
-    const resultEl = document.getElementById('ocr-result');
-    resultEl.style.display = '';
-
-    if (parsed.amount) {
-      document.getElementById('ocr-amount').textContent = (parsed.isExpense ? '-' : '+') + formatMoney(parsed.amount);
-    } else {
-      document.getElementById('ocr-amount').textContent = '未识别到金额';
-      document.getElementById('ocr-amount').style.color = 'rgba(255,255,255,.6)';
-    }
-    document.getElementById('ocr-merchant').textContent =
-      parsed.merchant ? `🏪 ${parsed.merchant}  ·  ${parsed.category}` :
-      `🏪 未识别到商家  ·  推测: ${parsed.category}`;
-    document.getElementById('ocr-raw').textContent = '原文: ' + text.replace(/\n/g, ' | ');
-  } catch (err) {
-    console.error(err);
-    procEl.style.display = 'none';
-    document.getElementById('ocr-buttons').style.display = '';
-    showToast('识别失败: ' + (err.message || '请重试'));
-  }
-}
-
-function confirmOCR() {
-  if (!ocrParsedData || !ocrParsedData.amount) { showToast('请先识别金额'); return; }
-  const { amount, merchant, category, isExpense } = ocrParsedData;
-  if (isExpense) document.getElementById('type-expense').click();
-  else document.getElementById('type-income').click();
-
-  const records = getRecords();
-  records.push({ id: Date.now(), type: isExpense ? 'expense' : 'income', amount, category, date: getNowDate(), note: merchant || '' });
-  saveRecords(records);
-  resetOCR();
-  renderAll();
-  showToast('记账成功 ✅');
-}
-
 // ===== 渲染 =====
 let trendChart = null, categoryChart = null;
 
@@ -995,41 +701,7 @@ document.querySelectorAll('.type-btn').forEach(btn => {
 });
 
 document.getElementById('btn-add').addEventListener('click', addRecord);
-document.getElementById('btn-ocr-confirm').addEventListener('click', confirmOCR);
 document.getElementById('date').value = getNowDate();
-
-// OCR: "长按粘贴" button → focus hidden input to trigger paste menu
-document.getElementById('btn-paste').addEventListener('click', () => {
-  const input = document.getElementById('paste-input');
-  input.focus();
-  input.select();
-  showToast('请长按此处 → 选择「粘贴」');
-});
-
-// OCR: "从相册选择" button → trigger file input
-document.getElementById('btn-gallery').addEventListener('click', () => {
-  document.getElementById('file-input').click();
-});
-
-// File input change → process image
-document.getElementById('file-input').addEventListener('change', function(e) {
-  if (e.target.files[0]) { processOCRImage(e.target.files[0]); e.target.value = ''; }
-});
-
-// Paste event - works on file:// protocol (user-initiated)
-document.addEventListener('paste', async (e) => {
-  const secAdd = document.getElementById('sec-add');
-  if (!secAdd.classList.contains('active')) return;
-  const items = e.clipboardData?.items;
-  if (!items) return;
-  for (const item of items) {
-    if (item.type.startsWith('image/')) {
-      e.preventDefault();
-      processOCRImage(item.getAsFile());
-      return;
-    }
-  }
-});
 
 // Filter listeners
 ['filter-month','filter-type','filter-category'].forEach(id => {
