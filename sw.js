@@ -1,13 +1,12 @@
 // Service Worker for 记账本 PWA
-const CACHE_NAME = 'accounting-v2';
+const CACHE_NAME = 'accounting-v3';
 const SHARE_CACHE = 'shared-images';
 
 // Files to cache for offline use
 const PRECACHE_URLS = [
   '/accounting.html',
   '/manifest.json',
-  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
-  'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
 ];
 
 // Install: pre-cache core assets
@@ -32,7 +31,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: serve cached or network
+// Fetch: network-first for HTML, cache-first for CDN assets
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
@@ -42,20 +41,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Normal fetch: cache-first for static, network-first for CDN
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        if (response.ok && event.request.method === 'GET') {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      });
-    })
-  );
+  // Network-first for local HTML files, cache-first for CDN
+  if (url.pathname.endsWith('.html') || url.pathname === '/') {
+    event.respondWith(networkFirst(event.request));
+  } else {
+    event.respondWith(
+      caches.match(event.request).then((cached) => cached || fetch(event.request))
+    );
+  }
 });
+
+async function networkFirst(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await caches.match(request);
+    return cached || new Response('Offline', { status: 503 });
+  }
+}
 
 // Handle Web Share Target POST
 async function handleShareTarget(request) {
