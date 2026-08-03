@@ -970,7 +970,7 @@ async function processOCRWithAI(file) {
     console.log('[OCR] Sending request...');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
-    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    const resp = await fetch(AI_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
       body: JSON.stringify(body),
