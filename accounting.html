@@ -383,7 +383,7 @@ tr:active td { background: #f5f5f5; }
         <button class="btn btn-ocr-scan" id="btn-ocr-scan">
           📸 一键识别
         </button>
-        <span style="font-size:11px;color:var(--text-secondary)">支持多张，最多5张</span>
+        <span style="font-size:11px;color:var(--text-secondary)">支持多张</span>
       </div>
       <input type="file" id="ocr-file-input" accept="image/*" multiple style="display:none">
       <div id="ocr-status" style="display:none;padding:8px 12px;background:var(--primary-light);border-radius:8px;margin-bottom:12px;font-size:12px;color:var(--primary)">
@@ -564,6 +564,19 @@ tr:active td { background: #f5f5f5; }
 </div>
 
 <script>
+// ===== SheetJS 动态加载 =====
+let XLSX = null;
+function loadXLSX() {
+  return new Promise((resolve, reject) => {
+    if (XLSX) return resolve(XLSX);
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    script.onload = () => { XLSX = window.XLSX; resolve(XLSX); };
+    script.onerror = () => reject(new Error('XLSX 加载失败'));
+    document.head.appendChild(script);
+  });
+}
+
 // ===== Chart.js 动态加载 =====
 let Chart = null;
 function loadChart() {
@@ -852,13 +865,75 @@ function deleteRecord(id) {
   renderAll();
 }
 
-function exportData() {
+async function exportData() {
   const records = getRecords();
   if (!records.length) { alert('无数据可导出'); return; }
-  const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+
+  await loadXLSX();
+  const sorted = [...records].sort((a,b) => a.date.localeCompare(b.date) || a.id - b.id);
+
+  // Build header rows (WeChat format)
+  const firstDate = sorted[0].date;
+  const lastDate = sorted[sorted.length-1].date;
+  const incomeCount = sorted.filter(r => r.type === 'income').length;
+  const expenseCount = sorted.filter(r => r.type === 'expense').length;
+  const incomeTotal = sorted.filter(r => r.type === 'income').reduce((s,r) => s + r.amount, 0);
+  const expenseTotal = sorted.filter(r => r.type === 'expense').reduce((s,r) => s + r.amount, 0);
+  const now = new Date();
+  const exportTime = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' +
+    String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+
+  const headerRows = [
+    ['记账本账单明细'],
+    [`起始时间：[${firstDate} 00:00:00] 终止时间：[${lastDate} 23:59:59]`],
+    ['导出类型：[全部]'],
+    [`导出时间：[${exportTime}]`],
+    [],
+    [`共${sorted.length}笔记录`],
+    [`收入：${incomeCount}笔 ${incomeTotal.toFixed(2)}元`],
+    [`支出：${expenseCount}笔 ${expenseTotal.toFixed(2)}元`],
+    [],
+    ['----------------------记账本账单明细列表--------------------'],
+    ['交易时间', '交易类型', '交易对方', '商品', '收/支', '金额(元)', '支付方式', '当前状态', '交易单号', '商户单号', '备注'],
+  ];
+
+  const dataRows = sorted.map(r => {
+    const [merchant, ...itemParts] = (r.note || '').split(' - ');
+    const item = itemParts.join(' - ') || r.category;
+    return [
+      r.date.replace(/-/g, '/') + ' ' + '00:00:00',
+      r.type === 'income' ? '转账' : '商户消费',
+      merchant || r.note || '',
+      item,
+      r.type === 'income' ? '收入' : '支出',
+      r.amount,
+      '',
+      '支付成功',
+      String(r.id),
+      '',
+      '/'
+    ];
+  });
+
+  const allRows = [...headerRows, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(allRows);
+
+  // Style: merge title cells
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 10 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 10 } },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `记账备份_${getNowDate()}.json`;
+  a.download = `记账本账单流水(${firstDate.replace(/-/g,'')}-${lastDate.replace(/-/g,'')})_${exportTime.replace(/[: -]/g,'')}.xlsx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -1072,7 +1147,6 @@ document.addEventListener('paste', (e) => {
 document.getElementById('ocr-file-input').addEventListener('change', function(e) {
   const files = e.target.files;
   if (!files.length) { e.target.value = ''; return; }
-  if (files.length > 5) { alert('最多选择 5 张图片'); e.target.value = ''; return; }
   processMultipleImages(files); e.target.value = '';
 });
 
