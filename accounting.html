@@ -750,7 +750,7 @@ function updateCategoryOptions(type) {
 
 // ===== AI 助手 =====
 const AI_KEY_STORAGE = 'ai_api_key';
-const DEEPSEEK_API = 'https://api.deepseek.com/chat/completions';
+const DEEPSEEK_API = 'https://api.deepseek.com/v1/chat/completions';
 
 function getApiKey() { return localStorage.getItem(AI_KEY_STORAGE); }
 function saveApiKey(key) { localStorage.setItem(AI_KEY_STORAGE, key); }
@@ -933,11 +933,11 @@ async function processOCRWithAI(file) {
     });
     const mime = file.type || 'image/png';
 
-    const resp = await fetch('https://api.deepseek.com/chat/completions', {
+    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: 'deepseek-v4-flash',
         messages: [{
           role: 'user',
           content: [
