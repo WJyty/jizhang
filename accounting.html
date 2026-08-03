@@ -623,7 +623,6 @@ function addRecord() {
   document.getElementById('amount').value = '';
   document.getElementById('note').value = '';
   document.getElementById('date').value = getNowDate();
-  updateCategoryOptions('expense'); // 初始只显示支出分类
   renderAll();
 }
 
@@ -703,6 +702,7 @@ document.querySelectorAll('.type-btn').forEach(btn => {
 
 document.getElementById('btn-add').addEventListener('click', addRecord);
 document.getElementById('date').value = getNowDate();
+updateCategoryOptions('expense'); // 初始只显示支出分类
 
 // Filter listeners
 ['filter-month','filter-type','filter-category'].forEach(id => {
