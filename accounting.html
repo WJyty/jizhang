@@ -565,13 +565,12 @@ tr:active td { background: #f5f5f5; }
 
 <script>
 // ===== SheetJS 动态加载 =====
-let XLSX = null;
 function loadXLSX() {
   return new Promise((resolve, reject) => {
-    if (XLSX) return resolve(XLSX);
+    if (window.XLSX) return resolve(window.XLSX);
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-    script.onload = () => { XLSX = window.XLSX; resolve(XLSX); };
+    script.onload = () => resolve(window.XLSX);
     script.onerror = () => reject(new Error('XLSX 加载失败'));
     document.head.appendChild(script);
   });
@@ -870,6 +869,7 @@ async function exportData() {
   if (!records.length) { alert('无数据可导出'); return; }
 
   await loadXLSX();
+  const XLSX = window.XLSX;
   const sorted = [...records].sort((a,b) => a.date.localeCompare(b.date) || a.id - b.id);
 
   // Build header rows (WeChat format)
@@ -944,6 +944,7 @@ async function importData(file) {
   if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
     // Parse XLSX
     await loadXLSX();
+  const XLSX = window.XLSX;
     const reader = new FileReader();
     reader.onload = function(e) {
       try {
