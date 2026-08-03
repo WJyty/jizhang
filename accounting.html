@@ -296,6 +296,30 @@ tr:active td { background: #f5f5f5; }
   border-color: var(--primary);
 }
 
+/* Multi-bill modal */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,.5); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-card {
+  background: var(--card); border-radius: var(--radius);
+  padding: 20px; width: 90%; max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.15);
+}
+.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+.modal-bill-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+  margin-bottom: 6px; cursor: pointer; transition: background .15s;
+}
+.modal-bill-item:hover { background: #fafafa; }
+.modal-bill-item.selected { border-color: var(--primary); background: var(--primary-light); }
+.modal-bill-item input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--primary); }
+.modal-bill-info { flex: 1; font-size: 13px; }
+.modal-bill-info .bill-title { font-weight: 600; margin-bottom: 2px; }
+.modal-bill-info .bill-detail { color: var(--text-secondary); font-size: 12px; }
+
 .action-bar {
   display: flex;
   gap: 6px;
@@ -415,9 +439,25 @@ tr:active td { background: #f5f5f5; }
     <div class="records-card">
       <div class="records-header"><h3>最近记录</h3></div>
       <div id="recent-list">
-        <div class="empty-msg">还没有记录，开始记第一笔吧 🎉</div>
-      </div>
+        <div class="empty-msg">还没有记录，开始记第一笔吧 🎉  </div>
+</div>
+
+<!-- Multi-bill selection modal -->
+<div class="modal-overlay" id="modal-overlay" style="display:none">
+  <div class="modal-card">
+    <div class="modal-title">📋 识别到 <span id="modal-count"></span> 笔账单</div>
+    <div style="max-height:50vh;overflow-y:auto;margin-bottom:12px" id="modal-list"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-sm btn-outline" onclick="selectAllBills(true)" style="flex:1">全选</button>
+      <button class="btn btn-sm btn-outline" onclick="selectAllBills(false)" style="flex:1">取消全选</button>
     </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-sm btn-outline" onclick="closeModal()" style="flex:1">取消</button>
+      <button class="btn btn-sm btn-primary" id="btn-confirm-bills" style="flex:1">添加选中项</button>
+    </div>
+  </div>
+</div>
+</div>
   </div>
 
   <!-- Section: 明细 -->
@@ -1059,17 +1099,21 @@ async function processOCRWithAI(file) {
           role: 'user',
           content: [
             { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
-            { type: 'text', text: `分析这张支付/转账截图。返回JSON格式（只返回JSON，不要其他内容）：
+            { type: 'text', text: `分析这张支付/转账截图，提取所有账单。如果有多笔交易，全部列出来。返回JSON格式（只返回JSON，不要其他内容）：
 {
-  "type": "expense 或 income",
-  "amount": 数字金额,
-  "category": "分类",
-  "date": "YYYY-MM-DD",
-  "note": "商家名 - 具体买了什么"
+  "bills": [
+    {
+      "type": "expense 或 income",
+      "amount": 数字金额,
+      "category": "分类",
+      "date": "YYYY-MM-DD",
+      "note": "商家名 - 具体买了什么"
+    }
+  ]
 }
 分类：支出类：餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出。收入类：工资、兼职、理财、红包、其他收入。
 根据截图推断分类。金额只提取数字。
-note 规则：格式为"商家名 - 具体消费内容"，例如"麦当劳 - 巨无霸套餐"、"滴滴 - 从家到公司"。商家名用日常简称，不要写全称（如"腾讯"而不是"腾讯云计算（北京）有限责任公司"）。如果看不出具体内容，只写商家简称。` }
+note 格式："商家名 - 具体消费内容"，例如"麦当劳 - 巨无霸套餐"。商家名用简称（如"腾讯"而不是"腾讯云计算（北京）有限责任公司"）。如果看不出具体内容，只写商家名。` }
           ]
       }],
       temperature: 0.1, max_tokens: 300
@@ -1101,36 +1145,27 @@ note 规则：格式为"商家名 - 具体消费内容"，例如"麦当劳 - 巨
     const jsonMatch = reply.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('AI 未返回有效JSON: ' + reply.substring(0, 200));
 
-    const parsed = JSON.parse(jsonMatch[0]);
-    console.log('[OCR] Parsed:', parsed);
+    let parsed = JSON.parse(jsonMatch[0]);
+    // Normalize: if old format (single bill), wrap in bills array
+    let bills = parsed.bills;
+    if (!bills && parsed.type) bills = [parsed];
+    if (!bills || !bills.length) throw new Error('未识别到任何账单');
 
-    // Fill form
-    if (parsed.type === 'income') {
-      document.getElementById('type-income').click();
-    } else {
-      document.getElementById('type-expense').click();
-    }
-
-    if (parsed.amount) document.getElementById('amount').value = parsed.amount;
-    if (parsed.date) document.getElementById('date').value = parsed.date;
-    else document.getElementById('date').value = getNowDate();
-    if (parsed.note) document.getElementById('note').value = parsed.note;
-
-    // Set category - check if valid
-    if (parsed.category) {
-      const validCats = [...EXPENSE_CATS, ...INCOME_CATS];
-      if (validCats.includes(parsed.category)) {
-        document.getElementById('category').value = parsed.category;
-      } else {
-        // Try partial match
-        const match = validCats.find(c => c.includes(parsed.category) || parsed.category.includes(c));
-        if (match) document.getElementById('category').value = match;
-      }
-    }
+    console.log('[OCR] Bills found:', bills.length);
 
     statusEl.style.display = 'none';
-    btn.textContent = '✅ 已识别';
-    setTimeout(() => { btn.textContent = '📸 一键识别'; btn.disabled = false; }, 1500);
+
+    if (bills.length === 1) {
+      // Single bill → auto-fill form
+      fillFormWithBill(bills[0]);
+      btn.textContent = '✅ 已识别';
+      setTimeout(() => { btn.textContent = '📸 一键识别'; btn.disabled = false; }, 1500);
+    } else {
+      // Multiple bills → show modal
+      btn.textContent = '📸 一键识别';
+      btn.disabled = false;
+      showBillModal(bills);
+    }
 
   } catch (err) {
     statusEl.style.display = 'none';
@@ -1138,6 +1173,87 @@ note 规则：格式为"商家名 - 具体消费内容"，例如"麦当劳 - 巨
     btn.textContent = '📸 一键识别';
     alert('识别失败：' + err.message);
   }
+}
+
+function fillFormWithBill(bill) {
+  if (bill.type === 'income') {
+    document.getElementById('type-income').click();
+  } else {
+    document.getElementById('type-expense').click();
+  }
+  if (bill.amount) document.getElementById('amount').value = bill.amount;
+  if (bill.date) document.getElementById('date').value = bill.date;
+  else document.getElementById('date').value = getNowDate();
+  if (bill.note) document.getElementById('note').value = bill.note;
+  if (bill.category) {
+    const validCats = [...EXPENSE_CATS, ...INCOME_CATS];
+    if (validCats.includes(bill.category)) {
+      document.getElementById('category').value = bill.category;
+    } else {
+      const match = validCats.find(c => c.includes(bill.category) || bill.category.includes(c));
+      if (match) document.getElementById('category').value = match;
+    }
+  }
+}
+
+let pendingBills = [];
+function showBillModal(bills) {
+  pendingBills = bills.map((b, i) => ({ ...b, selected: true }));
+  document.getElementById('modal-count').textContent = bills.length;
+  document.getElementById('modal-list').innerHTML = bills.map((b, i) => `
+    <div class="modal-bill-item selected" onclick="toggleBill(${i})" id="bill-item-${i}">
+      <input type="checkbox" checked id="bill-cb-${i}">
+      <div class="modal-bill-info">
+        <div class="bill-title">${b.type === 'income' ? '💚' : '❤️'} ${b.category || '其他'} · ${formatMoney(b.amount)}</div>
+        <div class="bill-detail">${b.note || '-'} · ${b.date || '今天'}</div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('modal-overlay').style.display = 'flex';
+  document.getElementById('btn-confirm-bills').onclick = confirmBills;
+}
+
+function toggleBill(i) {
+  pendingBills[i].selected = !pendingBills[i].selected;
+  const el = document.getElementById('bill-item-' + i);
+  const cb = document.getElementById('bill-cb-' + i);
+  if (pendingBills[i].selected) { el.classList.add('selected'); cb.checked = true; }
+  else { el.classList.remove('selected'); cb.checked = false; }
+}
+
+function selectAllBills(sel) {
+  pendingBills.forEach((_, i) => { pendingBills[i].selected = sel; });
+  pendingBills.forEach((_, i) => {
+    const el = document.getElementById('bill-item-' + i);
+    const cb = document.getElementById('bill-cb-' + i);
+    if (sel) { el.classList.add('selected'); cb.checked = true; }
+    else { el.classList.remove('selected'); cb.checked = false; }
+  });
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+}
+
+function confirmBills() {
+  const selected = pendingBills.filter(b => b.selected);
+  if (!selected.length) { alert('请至少选一条'); return; }
+  const records = getRecords();
+  const now = getNowDate();
+  selected.forEach(b => {
+    records.push({
+      id: Date.now() + Math.random(),
+      type: b.type || 'expense',
+      amount: b.amount || 0,
+      category: b.category || '其他支出',
+      date: b.date || now,
+      note: b.note || ''
+    });
+  });
+  saveRecords(records);
+  document.getElementById('modal-overlay').style.display = 'none';
+  renderAll();
+  alert(`已添加 ${selected.length} 笔记录`);
 }
 
 // ===== 事件 =====
