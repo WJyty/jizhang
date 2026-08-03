@@ -935,11 +935,11 @@ async function processOCRWithAI(file) {
     console.log('[OCR] Image encoded, base64 length:', base64.length);
 
     const body = {
-      model: 'deepseek-v4-flash',
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: `分析这张支付/转账截图。返回JSON格式（只返回JSON，不要其他内容）：
+        model: 'deepseek-chat',
+        messages: [{
+          role: 'user',
+          content: JSON.stringify([
+            { type: 'text', text: `分析这张支付/转账截图。返回JSON格式（只返回JSON，不要其他内容）：
 {
   "type": "expense 或 income",
   "amount": 数字金额,
@@ -949,8 +949,8 @@ async function processOCRWithAI(file) {
 }
 分类：支出类：餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出。收入类：工资、兼职、理财、红包、其他收入。
 根据截图推断分类。金额只提取数字。` },
-          { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } }
-        ]
+            { type: 'image', image: { data: base64, format: 'base64' } }
+          ])
       }],
       temperature: 0.1, max_tokens: 300
     };
