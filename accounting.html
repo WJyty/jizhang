@@ -938,7 +938,59 @@ async function exportData() {
   URL.revokeObjectURL(a.href);
 }
 
-function importData(file) {
+async function importData(file) {
+  const name = file.name.toLowerCase();
+
+  if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    // Parse XLSX
+    await loadXLSX();
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+        // Find header row (contains '交易时间')
+        let headerIdx = -1;
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i] && rows[i][0] === '交易时间') { headerIdx = i; break; }
+        }
+        if (headerIdx < 0) throw new Error('未找到交易数据表头');
+
+        const records = getRecords();
+        const existingIds = new Set(records.map(r => r.id));
+        let added = 0;
+
+        for (let i = headerIdx + 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || !row[0] || !row[4] || !row[5]) continue;
+          const amount = parseFloat(row[5]);
+          if (isNaN(amount) || amount <= 0) continue;
+
+          const type = row[4] === '收入' ? 'income' : 'expense';
+          const dateStr = String(row[0]).replace(/\//g, '-').split(' ')[0];
+          const merchant = row[2] || '';
+          const item = row[3] || '';
+          const note = item ? `${merchant} - ${item}` : merchant;
+          const id = Date.now() + Math.random();
+
+          if (!existingIds.has(id)) {
+            records.push({ id, type, amount, category: guessCategory(merchant, item, type), date: dateStr, note });
+            existingIds.add(id);
+            added++;
+          }
+        }
+
+        saveRecords(records); renderAll();
+        alert(`已导入 ${added} 条新记录`);
+      } catch (err) { alert('文件解析失败: ' + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+    return;
+  }
+
+  // JSON import (legacy)
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
@@ -955,6 +1007,25 @@ function importData(file) {
     } catch { alert('文件格式错误'); }
   };
   reader.readAsText(file);
+}
+
+function guessCategory(merchant, item, type) {
+  if (type === 'income') return '其他收入';
+  const text = (merchant + item).toLowerCase();
+  const catMap = {
+    '餐饮': ['餐','饭','面','粉','麻辣','火锅','奶茶','咖啡','外卖','美团','饿了么','肯德基','麦当劳','餐厅','食','饮'],
+    '交通': ['滴滴','打车','地铁','公交','加油','高速','停车','etc'],
+    '购物': ['淘宝','京东','拼多多','天猫','超市','商场','唯品会','便利'],
+    '娱乐': ['电影','ktv','游戏','视频','会员','音乐','演出','门票'],
+    '居住': ['房租','水电','物业','燃气','暖气'],
+    '通讯': ['移动','联通','电信','话费','流量'],
+    '医疗': ['医院','药','医','挂号'],
+    '教育': ['书','课程','培训','考试']
+  };
+  for (const [cat, kws] of Object.entries(catMap)) {
+    if (kws.some(k => text.includes(k))) return cat;
+  }
+  return '其他支出';
 }
 
 function clearAllData() {
