@@ -623,6 +623,7 @@ function addRecord() {
   document.getElementById('amount').value = '';
   document.getElementById('note').value = '';
   document.getElementById('date').value = getNowDate();
+  updateCategoryOptions('expense'); // 初始只显示支出分类
   renderAll();
 }
 
