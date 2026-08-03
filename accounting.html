@@ -951,12 +951,32 @@ async function importData(file) {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
-        // Find header row (contains '交易时间')
-        let headerIdx = -1;
+        // Find header row and map columns by name
+        let headerIdx = -1, colMap = {};
         for (let i = 0; i < rows.length; i++) {
-          if (rows[i] && rows[i][0] === '交易时间') { headerIdx = i; break; }
+          if (!rows[i]) continue;
+          const r = rows[i];
+          if (r.some(c => String(c || '').includes('交易时间'))) {
+            headerIdx = i;
+            const names = ['交易时间','交易对方','商品','收/支','金额','金额(元)','备注'];
+            // Map each column name to its index
+            r.forEach((c, j) => {
+              const s = String(c || '').trim();
+              for (const n of names) {
+                if (s === n || s.includes(n)) { colMap[n] = j; break; }
+              }
+            });
+            break;
+          }
         }
-        if (headerIdx < 0) throw new Error('未找到交易数据表头');
+        if (headerIdx < 0 || colMap['交易时间'] == null) throw new Error('未找到交易数据表头');
+
+        const getCol = (row, name) => row[colMap[name]] != null ? row[colMap[name]] : '';
+        const getAmount = (row) => {
+          if (colMap['金额(元)'] != null) return parseFloat(row[colMap['金额(元)']]) || 0;
+          if (colMap['金额'] != null) return parseFloat(row[colMap['金额']]) || 0;
+          return 0;
+        };
 
         const records = getRecords();
         const existingIds = new Set(records.map(r => r.id));
@@ -964,14 +984,14 @@ async function importData(file) {
 
         for (let i = headerIdx + 1; i < rows.length; i++) {
           const row = rows[i];
-          if (!row || !row[0] || !row[3] || !row[4]) continue;
-          const amount = Math.abs(parseFloat(row[4]));
+          if (!row || !getCol(row, '交易时间') || !getCol(row, '收/支')) continue;
+          const amount = Math.abs(getAmount(row));
           if (isNaN(amount) || amount <= 0) continue;
 
-          const type = row[3] === '收入' ? 'income' : 'expense';
-          const dateStr = String(row[0]).replace(/\//g, '-').split(' ')[0];
-          const merchant = row[1] || '';
-          const item = row[2] || '';
+          const type = String(getCol(row, '收/支')).includes('收入') ? 'income' : 'expense';
+          const dateStr = String(getCol(row, '交易时间')).replace(/\//g, '-').split(' ')[0];
+          const merchant = getCol(row, '交易对方');
+          const item = getCol(row, '商品');
           const note = item ? `${merchant} - ${item}` : merchant;
           const id = Date.now() + Math.random();
 
