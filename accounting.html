@@ -281,6 +281,21 @@ tr:active td { background: #f5f5f5; }
 .chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-secondary); }
 .chart-card canvas { max-height: 240px; }
 
+/* Granularity selector */
+.btn-granularity {
+  padding: 6px 14px;
+  font-size: 13px;
+  background: var(--card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.btn-granularity.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
 .action-bar {
   display: flex;
   gap: 6px;
@@ -441,21 +456,27 @@ tr:active td { background: #f5f5f5; }
 
   <!-- Section: 统计 -->
   <div class="section" id="sec-stats">
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button class="btn btn-sm btn-granularity active" data-gran="月">月</button>
+      <button class="btn btn-sm btn-granularity" data-gran="周">周</button>
+      <button class="btn btn-sm btn-granularity" data-gran="日">日</button>
+      <button class="btn btn-sm btn-granularity" data-gran="年">年</button>
+    </div>
     <div class="charts-grid">
       <div class="chart-card">
-        <h3>近6个月收支趋势</h3>
+        <h3 id="chart-trend-title">本月周趋势</h3>
         <canvas id="chart-trend"></canvas>
       </div>
       <div class="chart-card">
-        <h3>本月支出分类</h3>
+        <h3 id="chart-category-title">本月支出分类</h3>
         <canvas id="chart-category"></canvas>
       </div>
     </div>
     <div class="records-card">
-      <div class="records-header"><h3>月度汇总</h3></div>
+      <div class="records-header"><h3 id="summary-table-title">月度汇总</h3></div>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>月份</th><th>收入</th><th>支出</th><th>结余</th></tr></thead>
+          <thead id="summary-table-head"><tr><th>月份</th><th>收入</th><th>支出</th><th>结余</th></tr></thead>
           <tbody id="monthly-summary">
             <tr><td colspan="4"><div class="empty-msg">暂无数据</div></td></tr>
           </tbody>
@@ -618,31 +639,112 @@ function updateFilterOptions() {
   if (fCat) fCat.innerHTML = '<option value="">全部分类</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
 }
 
+let currentGran = '月';
+
+// Get week key from date: "2026-W31"
+function getWeekKey(d) {
+  const date = new Date(d);
+  date.setHours(0,0,0,0);
+  const day = (date.getDay() + 6) % 7; // Monday=0
+  const monday = new Date(date);
+  monday.setDate(date.getDate() - day);
+  return monday.getFullYear() + '-W' + String(Math.ceil((monday.getDate() - 1) / 7 + (new Date(monday.getFullYear(), monday.getMonth(), 1).getDay() === 1 ? 0 : 0)) + 1).padStart(2,'0');
+}
+
+function getWeekLabel(d) {
+  const date = new Date(d);
+  const day = (date.getDay() + 6) % 7;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() - day);
+  const wNum = Math.ceil(monday.getDate() / 7);
+  return monday.getMonth() + 1 + '月第' + wNum + '周';
+}
+
+function getGranData(records, gran) {
+  const d = new Date();
+  let labels = [], keyFn, filterFn, title;
+
+  if (gran === '日') {
+    // Last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() - i);
+      labels.push((day.getMonth()+1) + '/' + day.getDate());
+    }
+    keyFn = r => r.date;
+    filterFn = (r, i) => {
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() - (6 - i));
+      return r.date === day.getFullYear() + '-' + String(day.getMonth()+1).padStart(2,'0') + '-' + String(day.getDate()).padStart(2,'0');
+    };
+    title = '近7天每日趋势';
+  } else if (gran === '周') {
+    // This week Mon-Sun
+    const dayOfWeek = (d.getDay() + 6) % 7;
+    const dayNames = ['周一','周二','周三','周四','周五','周六','周日'];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dayOfWeek + i);
+      labels.push(dayNames[i] + ' ' + (day.getMonth()+1) + '/' + day.getDate());
+    }
+    keyFn = r => r.date;
+    filterFn = (r, i) => {
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dayOfWeek + i);
+      return r.date === day.getFullYear() + '-' + String(day.getMonth()+1).padStart(2,'0') + '-' + String(day.getDate()).padStart(2,'0');
+    };
+    title = '本周每日趋势';
+  } else if (gran === '月') {
+    // This month by weeks
+    const year = d.getFullYear(), month = d.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const totalDays = lastDay.getDate();
+    const startDow = (firstDay.getDay() + 6) % 7; // Monday=0
+    const weeks = Math.ceil((totalDays + startDow) / 7);
+    for (let w = 0; w < weeks; w++) {
+      labels.push('第' + (w+1) + '周');
+    }
+    keyFn = r => r.date;
+    filterFn = (r, i) => {
+      const rDate = new Date(r.date);
+      if (rDate.getFullYear() !== year || rDate.getMonth() !== month) return false;
+      const rDay = rDate.getDate() + startDow - 1;
+      return Math.floor(rDay / 7) === i;
+    };
+    title = '本月周趋势';
+  } else if (gran === '年') {
+    // This year by months
+    for (let m = 1; m <= 12; m++) labels.push(m + '月');
+    keyFn = r => getMonthKey(r.date).substring(5);
+    filterFn = (r, i) => {
+      return r.date.startsWith(d.getFullYear() + '-') && parseInt(getMonthKey(r.date).substring(5)) === i + 1;
+    };
+    title = d.getFullYear() + '年月趋势';
+  }
+
+  return { labels, filterFn, title };
+}
+
 async function renderCharts() {
   const section = document.getElementById('sec-stats');
   if (!section.classList.contains('active')) return;
 
   await loadChart();
   const records = getRecords();
+  const gran = currentGran;
+  const { labels, filterFn, title } = getGranData(records, gran);
 
-  const last6Months = [];
-  const d = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
-    last6Months.push(m.getFullYear() + '-' + String(m.getMonth()+1).padStart(2,'0'));
-  }
-  const monthlyIncome = last6Months.map(m =>
-    records.filter(r => getMonthKey(r.date) === m && r.type === 'income').reduce((s,r) => s + r.amount, 0));
-  const monthlyExpense = last6Months.map(m =>
-    records.filter(r => getMonthKey(r.date) === m && r.type === 'expense').reduce((s,r) => s + r.amount, 0));
+  const incomes = labels.map((_, i) =>
+    records.filter(r => filterFn(r, i) && r.type === 'income').reduce((s,r) => s + r.amount, 0));
+  const expenses = labels.map((_, i) =>
+    records.filter(r => filterFn(r, i) && r.type === 'expense').reduce((s,r) => s + r.amount, 0));
+
+  document.getElementById('chart-trend-title').textContent = title;
 
   const ctx1 = document.getElementById('chart-trend').getContext('2d');
   if (trendChart) trendChart.destroy();
   trendChart = new Chart(ctx1, {
     type: 'bar',
-    data: { labels: last6Months, datasets: [
-      { label: '收入', data: monthlyIncome, backgroundColor: '#67c23a', borderRadius: 4 },
-      { label: '支出', data: monthlyExpense, backgroundColor: '#f56c6c', borderRadius: 4 }
+    data: { labels, datasets: [
+      { label: '收入', data: incomes, backgroundColor: '#67c23a', borderRadius: 4 },
+      { label: '支出', data: expenses, backgroundColor: '#f56c6c', borderRadius: 4 }
     ]},
     options: {
       responsive: true,
@@ -651,11 +753,17 @@ async function renderCharts() {
     }
   });
 
-  const thisMonth = getThisMonth();
+  // Category pie: aggregate all records in the current granularity period
   const catMap = {};
-  records.filter(r => getMonthKey(r.date) === thisMonth && r.type === 'expense').forEach(r => { catMap[r.category] = (catMap[r.category] || 0) + r.amount; });
+  labels.forEach((_, i) => {
+    records.filter(r => filterFn(r, i) && r.type === 'expense').forEach(r => {
+      catMap[r.category] = (catMap[r.category] || 0) + r.amount;
+    });
+  });
   const catLabels = Object.keys(catMap);
   const catValues = Object.values(catMap);
+  const catTitle = { '日':'近7天支出分类','周':'本周支出分类','月':'本月支出分类','年':'今年支出分类' }[gran];
+  document.getElementById('chart-category-title').textContent = catTitle;
   const colors = ['#f56c6c','#e6a23c','#409eff','#67c23a','#909399','#b37feb','#5cdbd3','#ff85c0','#ffc069'];
 
   const ctx2 = document.getElementById('chart-category').getContext('2d');
@@ -666,14 +774,18 @@ async function renderCharts() {
     options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 12, boxWidth: 10 } } } }
   });
 
-  const allMonths = [...new Set(records.map(r => getMonthKey(r.date)))].sort().reverse();
+  // Summary table
+  const sumTitle = { '日':'每日汇总','周':'每日汇总','月':'周汇总','年':'月汇总' }[gran];
+  const colLabel = { '日':'日期','周':'日期','月':'周','年':'月' }[gran];
+  document.getElementById('summary-table-title').textContent = sumTitle;
+  document.getElementById('summary-table-head').innerHTML = `<tr><th>${colLabel}</th><th>收入</th><th>支出</th><th>结余</th></tr>`;
+
   const st = document.getElementById('monthly-summary');
-  if (!allMonths.length) { st.innerHTML = '<tr><td colspan="4"><div class="empty-msg">暂无数据</div></td></tr>'; }
+  if (!labels.length) { st.innerHTML = '<tr><td colspan="4"><div class="empty-msg">暂无数据</div></td></tr>'; }
   else {
-    st.innerHTML = allMonths.map(m => {
-      const inc = records.filter(r => getMonthKey(r.date) === m && r.type === 'income').reduce((s,r) => s + r.amount, 0);
-      const exp = records.filter(r => getMonthKey(r.date) === m && r.type === 'expense').reduce((s,r) => s + r.amount, 0);
-      return `<tr><td>${m}</td><td style="color:var(--income)">${formatMoney(inc)}</td><td style="color:var(--expense)">${formatMoney(exp)}</td><td style="color:${inc-exp>=0?'var(--income)':'var(--expense)'};font-weight:600">${formatMoney(inc-exp)}</td></tr>`;
+    st.innerHTML = labels.map((l, i) => {
+      const inc = incomes[i], exp = expenses[i];
+      return `<tr><td>${l}</td><td style="color:var(--income)">${formatMoney(inc)}</td><td style="color:var(--expense)">${formatMoney(exp)}</td><td style="color:${inc-exp>=0?'var(--income)':'var(--expense)'};font-weight:600">${formatMoney(inc-exp)}</td></tr>`;
     }).join('');
   }
 }
@@ -1058,6 +1170,16 @@ document.querySelectorAll('.type-btn').forEach(btn => {
 document.getElementById('btn-add').addEventListener('click', addRecord);
 document.getElementById('date').value = getNowDate();
 updateCategoryOptions('expense'); // 初始只显示支出分类
+
+// Granularity buttons
+document.querySelectorAll('.btn-granularity').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.btn-granularity').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    currentGran = this.dataset.gran;
+    renderCharts();
+  });
+});
 
 // Filter listeners
 ['filter-month','filter-type','filter-category'].forEach(id => {
