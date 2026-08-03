@@ -902,7 +902,7 @@ async function exportData() {
 
   const dataRows = sorted.map(r => {
     const note = r.note || '/';
-    const parts = note.split(/ - | -|- /); // handle " - ", " -", "- " all formats
+    const parts = note.split(/ *- */); // split on dash with optional spaces
     const merchant = parts[0] || '/';
     const item = parts.slice(1).join(' - ') || r.category;
     return [
