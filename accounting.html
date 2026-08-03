@@ -901,9 +901,10 @@ async function exportData() {
   ];
 
   const dataRows = sorted.map(r => {
-    const [merchant, ...itemParts] = (r.note || '').split(' - ');
-    const item = itemParts.join(' - ') || r.category;
     const note = r.note || '/';
+    const parts = note.split(/ - | -|- /); // handle " - ", " -", "- " all formats
+    const merchant = parts[0] || '/';
+    const item = parts.slice(1).join(' - ') || r.category;
     return [
       r.date.replace(/-/g, '/') + ' ' + '00:00:00',
       merchant || note,
