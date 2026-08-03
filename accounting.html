@@ -1284,7 +1284,7 @@ async function processOneImage(file, idx, key) {
         }],
         temperature: 0.1, max_tokens: 500
       }),
-      signal: AbortSignal.timeout(30000)
+      signal: AbortSignal.timeout(60000)
     });
 
     if (!resp.ok) {
