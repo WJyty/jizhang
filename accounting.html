@@ -989,7 +989,8 @@ async function importData(file) {
           if (isNaN(amount) || amount <= 0) continue;
 
           const type = String(getCol(row, '收/支')).includes('收入') ? 'income' : 'expense';
-          const dateStr = String(getCol(row, '交易时间')).replace(/\//g, '-').split(' ')[0];
+          const rawDate = getCol(row, '交易时间');
+          const dateStr = normalizeDate(rawDate);
           const merchant = getCol(row, '交易对方');
           const item = getCol(row, '商品');
           const note = item ? `${merchant} - ${item}` : merchant;
@@ -1027,6 +1028,25 @@ async function importData(file) {
     } catch { alert('文件格式错误'); }
   };
   reader.readAsText(file);
+}
+
+// Convert Excel serial number or datetime string to "YYYY-MM-DD" format
+function normalizeDate(rawDate) {
+  // Excel serial: days since 1900-01-01 (with 1900 leap year bug)
+  if (typeof rawDate === 'number') {
+    const serial = rawDate;
+    // Excel treats 1900 as leap year; subtract 1 to compensate after Feb 28
+    const days = Math.floor(serial);
+    const frac = serial - days;
+    const date = new Date(Date.UTC(1900, 0, 1) + (days - 1) * 86400000);
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  // String format
+  const s = String(rawDate).replace(/\//g, '-');
+  return s.split(' ')[0];
 }
 
 function guessCategory(merchant, item, type) {
