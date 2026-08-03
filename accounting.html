@@ -895,24 +895,20 @@ async function exportData() {
     [`支出：${expenseCount}笔 ${expenseTotal.toFixed(2)}元`],
     [],
     ['----------------------记账本账单明细列表--------------------'],
-    ['交易时间', '交易类型', '交易对方', '商品', '收/支', '金额(元)', '支付方式', '当前状态', '交易单号', '商户单号', '备注'],
+    ['交易时间', '交易对方', '商品', '收/支', '金额(元)', '备注'],
   ];
 
   const dataRows = sorted.map(r => {
     const [merchant, ...itemParts] = (r.note || '').split(' - ');
     const item = itemParts.join(' - ') || r.category;
+    const note = r.note || '/';
     return [
       r.date.replace(/-/g, '/') + ' ' + '00:00:00',
-      r.type === 'income' ? '转账' : '商户消费',
-      merchant || r.note || '',
+      merchant || note,
       item,
       r.type === 'income' ? '收入' : '支出',
       r.amount,
-      '',
-      '支付成功',
-      String(r.id),
-      '',
-      '/'
+      note
     ];
   });
 
@@ -965,14 +961,14 @@ async function importData(file) {
 
         for (let i = headerIdx + 1; i < rows.length; i++) {
           const row = rows[i];
-          if (!row || !row[0] || !row[4] || !row[5]) continue;
-          const amount = Math.abs(parseFloat(row[5]));
+          if (!row || !row[0] || !row[3] || !row[4]) continue;
+          const amount = Math.abs(parseFloat(row[4]));
           if (isNaN(amount) || amount <= 0) continue;
 
-          const type = row[4] === '收入' ? 'income' : 'expense';
+          const type = row[3] === '收入' ? 'income' : 'expense';
           const dateStr = String(row[0]).replace(/\//g, '-').split(' ')[0];
-          const merchant = row[2] || '';
-          const item = row[3] || '';
+          const merchant = row[1] || '';
+          const item = row[2] || '';
           const note = item ? `${merchant} - ${item}` : merchant;
           const id = Date.now() + Math.random();
 
@@ -1279,7 +1275,7 @@ async function processOneImage(file, idx, key) {
           role: 'user',
           content: [
             { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
-            { type: 'text', text: `分析这张支付/转账截图，提取所有账单。返回JSON格式（只返回JSON）：{"bills":[{"type":"expense或income","amount":数字,"category":"分类","date":"YYYY-MM-DD","note":"商家名-具体内容"}]}。category只能是以下之一：餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出、工资、兼职、理财、红包、其他收入。商家名用简称。` }
+            { type: 'text', text: `分析这张支付/转账截图，提取所有消费账单。返回JSON格式（只返回JSON）：{"bills":[{"type":"expense","amount":数字（正数不要负数）,"category":"分类","date":"YYYY-MM-DD","note":"交易对方-商品"}]}。category只能是：餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出。note格式严格为"商家名-具体购买内容"，如"美团-黄焖鸡米饭"。金额必须是正数。商家名用简称。` }
           ]
         }],
         temperature: 0.1, max_tokens: 500
