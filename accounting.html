@@ -750,7 +750,8 @@ function updateCategoryOptions(type) {
 
 // ===== AI 助手 =====
 const AI_KEY_STORAGE = 'ai_api_key';
-const DEEPSEEK_API = 'https://api.deepseek.com/v1/chat/completions';
+const AI_API = 'https://tokenhub.tencentmaas.com/v1/chat/completions';
+const AI_MODEL = 'qwen3.5-flash';
 
 function getApiKey() { return localStorage.getItem(AI_KEY_STORAGE); }
 function saveApiKey(key) { localStorage.setItem(AI_KEY_STORAGE, key); }
@@ -845,11 +846,11 @@ document.getElementById('btn-ai-send').addEventListener('click', async () => {
 
   try {
     const summary = buildRecordsSummary();
-    const resp = await fetch(DEEPSEEK_API, {
+    const resp = await fetch(AI_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: AI_MODEL,
         messages: [
           { role: 'system', content: `你是记账分析助手。根据用户提供的记账数据回答问题。简洁回复，使用 ¥ 符号表示金额。数据如下：\n\n${summary}` },
           { role: 'user', content: question }
@@ -935,10 +936,11 @@ async function processOCRWithAI(file) {
     console.log('[OCR] Image encoded, base64 length:', base64.length);
 
     const body = {
-        model: 'deepseek-chat',
+        model: AI_MODEL,
         messages: [{
           role: 'user',
-          content: JSON.stringify([
+          content: [
+            { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
             { type: 'text', text: `分析这张支付/转账截图。返回JSON格式（只返回JSON，不要其他内容）：
 {
   "type": "expense 或 income",
@@ -948,9 +950,8 @@ async function processOCRWithAI(file) {
   "note": "商家或备注"
 }
 分类：支出类：餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出。收入类：工资、兼职、理财、红包、其他收入。
-根据截图推断分类。金额只提取数字。` },
-            { type: 'image', image: { data: base64, format: 'base64' } }
-          ])
+根据截图推断分类。金额只提取数字。` }
+          ]
       }],
       temperature: 0.1, max_tokens: 300
     };
