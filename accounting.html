@@ -383,7 +383,7 @@ tr:active td { background: #f5f5f5; }
         <button class="btn btn-ocr-scan" id="btn-ocr-scan">
           📸 一键识别
         </button>
-        <span style="font-size:11px;color:var(--text-secondary)">截图自动填写信息</span>
+        <span style="font-size:11px;color:var(--text-secondary)">支持多张，最多5张</span>
       </div>
       <input type="file" id="ocr-file-input" accept="image/*" multiple style="display:none">
       <div id="ocr-status" style="display:none;padding:8px 12px;background:var(--primary-light);border-radius:8px;margin-bottom:12px;font-size:12px;color:var(--primary)">
@@ -1070,7 +1070,10 @@ document.addEventListener('paste', (e) => {
 });
 
 document.getElementById('ocr-file-input').addEventListener('change', function(e) {
-  if (e.target.files.length) { processMultipleImages(e.target.files); e.target.value = ''; }
+  const files = e.target.files;
+  if (!files.length) { e.target.value = ''; return; }
+  if (files.length > 5) { alert('最多选择 5 张图片'); e.target.value = ''; return; }
+  processMultipleImages(files); e.target.value = '';
 });
 
 async function processMultipleImages(files) {
