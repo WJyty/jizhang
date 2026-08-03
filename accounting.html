@@ -966,7 +966,7 @@ async function importData(file) {
         for (let i = headerIdx + 1; i < rows.length; i++) {
           const row = rows[i];
           if (!row || !row[0] || !row[4] || !row[5]) continue;
-          const amount = parseFloat(row[5]);
+          const amount = Math.abs(parseFloat(row[5]));
           if (isNaN(amount) || amount <= 0) continue;
 
           const type = row[4] === '收入' ? 'income' : 'expense';
