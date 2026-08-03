@@ -679,7 +679,7 @@ function updateFilterOptions() {
   if (fCat) fCat.innerHTML = '<option value="">全部分类</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
 }
 
-let currentGran = '月';
+let currentGran = '月'; //日/周/月/年
 
 // Get week key from date: "2026-W31"
 function getWeekKey(d) {
