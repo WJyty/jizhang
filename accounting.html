@@ -162,6 +162,19 @@ body {
 .btn-danger { background: #fff; color: var(--expense); border: 1px solid var(--expense); }
 .btn-danger:active { background: var(--expense-bg); }
 
+/* OCR Scan Button */
+.btn-ocr-scan {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.btn-ocr-scan:active { opacity: .85; transform: scale(.97); }
+.btn-ocr-scan:disabled { opacity: .5; pointer-events: none; }
+
 /* Type toggle */
 .type-toggle {
   display: flex;
@@ -325,9 +338,18 @@ tr:active td { background: #f5f5f5; }
   <!-- Section: 记一笔 -->
   <div class="section active" id="sec-add">
 
-    <!-- 手动输入 -->
+    <!-- 记一笔表单 -->
     <div class="form-card">
-      <div class="form-title">手动输入</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="btn btn-ocr-scan" id="btn-ocr-scan">
+          📸 一键识别
+        </button>
+        <span style="font-size:11px;color:var(--text-secondary)">截图自动填写信息</span>
+      </div>
+      <input type="file" id="ocr-file-input" accept="image/*" style="display:none">
+      <div id="ocr-status" style="display:none;padding:8px 12px;background:var(--primary-light);border-radius:8px;margin-bottom:12px;font-size:12px;color:var(--primary)">
+        ⏳ AI 识别中...
+      </div>
       <div class="type-toggle">
         <button class="type-btn active-expense" data-type="expense" id="type-expense">支出</button>
         <button class="type-btn" data-type="income" id="type-income">收入</button>
@@ -867,6 +889,130 @@ document.getElementById('btn-ai-send').addEventListener('click', async () => {
     document.getElementById('ai-chat-area').style.display = '';
   }
 })();
+
+// ===== 截图 AI 识别 =====
+document.getElementById('btn-ocr-scan').addEventListener('click', () => {
+  document.getElementById('ocr-file-input').click();
+});
+
+// Also support paste on the 记一笔 page
+document.addEventListener('paste', (e) => {
+  const secAdd = document.getElementById('sec-add');
+  if (!secAdd || !secAdd.classList.contains('active')) return;
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      e.preventDefault();
+      processOCRWithAI(item.getAsFile());
+      return;
+    }
+  }
+});
+
+document.getElementById('ocr-file-input').addEventListener('change', function(e) {
+  if (e.target.files[0]) { processOCRWithAI(e.target.files[0]); e.target.value = ''; }
+});
+
+async function processOCRWithAI(file) {
+  const key = getApiKey();
+  if (!key) { alert('请先在 🤖 AI 标签页设置 DeepSeek API Key'); return; }
+
+  const btn = document.getElementById('btn-ocr-scan');
+  const statusEl = document.getElementById('ocr-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ 识别中...';
+  statusEl.style.display = '';
+
+  try {
+    // Convert image to base64
+    const base64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(file);
+    });
+    const mime = file.type || 'image/png';
+
+    const resp = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: `分析这张支付/转账截图。返回JSON格式（只返回JSON，不要其他内容）：
+{
+  "type": "expense 或 income",
+  "amount": 数字金额,
+  "category": "分类",
+  "date": "YYYY-MM-DD",
+  "note": "商家或备注"
+}
+
+分类只能是以下之一：
+支出类：餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出
+收入类：工资、兼职、理财、红包、其他收入
+
+根据截图内容（支付App名称、收款方、商品类型等）推断最合适的分类。
+日期如果有就提取，没有就用今天的日期。
+金额只提取数字。` },
+            { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } }
+          ]
+        }],
+        temperature: 0.1, max_tokens: 300
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(`API错误 (${resp.status}): ${err.substring(0, 100)}`);
+    }
+
+    const data = await resp.json();
+    const reply = data.choices[0].message.content;
+
+    // Parse JSON from AI response (handle possible markdown wrapping)
+    const jsonMatch = reply.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('AI 未返回有效JSON');
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // Fill form
+    if (parsed.type === 'income') {
+      document.getElementById('type-income').click();
+    } else {
+      document.getElementById('type-expense').click();
+    }
+
+    if (parsed.amount) document.getElementById('amount').value = parsed.amount;
+    if (parsed.date) document.getElementById('date').value = parsed.date;
+    else document.getElementById('date').value = getNowDate();
+    if (parsed.note) document.getElementById('note').value = parsed.note;
+
+    // Set category - check if valid
+    if (parsed.category) {
+      const validCats = [...EXPENSE_CATS, ...INCOME_CATS];
+      if (validCats.includes(parsed.category)) {
+        document.getElementById('category').value = parsed.category;
+      } else {
+        // Try partial match
+        const match = validCats.find(c => c.includes(parsed.category) || parsed.category.includes(c));
+        if (match) document.getElementById('category').value = match;
+      }
+    }
+
+    statusEl.style.display = 'none';
+    btn.textContent = '✅ 已识别';
+    setTimeout(() => { btn.textContent = '📸 一键识别'; btn.disabled = false; }, 1500);
+
+  } catch (err) {
+    statusEl.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '📸 一键识别';
+    alert('识别失败：' + err.message);
+  }
+}
 
 // ===== 事件 =====
 // Tabs
