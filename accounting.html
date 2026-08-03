@@ -730,6 +730,8 @@ async function renderCharts() {
     records.filter(r => filterFn(r, i) && r.type === 'expense').reduce((s,r) => s + r.amount, 0));
 
   document.getElementById('chart-trend-title').textContent = title;
+  document.getElementById('chart-trend-title').parentElement.style.display = gran === '日' ? 'none' : '';
+  document.getElementById('chart-category-title').parentElement.style.flex = gran === '日' ? '1' : '';
 
   const ctx1 = document.getElementById('chart-trend').getContext('2d');
   if (trendChart) trendChart.destroy();
