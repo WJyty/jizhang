@@ -665,17 +665,10 @@ function getGranData(records, gran) {
   let labels = [], keyFn, filterFn, title;
 
   if (gran === '日') {
-    // Last 7 days
-    for (let i = 6; i >= 0; i--) {
-      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() - i);
-      labels.push((day.getMonth()+1) + '/' + day.getDate());
-    }
-    keyFn = r => r.date;
-    filterFn = (r, i) => {
-      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() - (6 - i));
-      return r.date === day.getFullYear() + '-' + String(day.getMonth()+1).padStart(2,'0') + '-' + String(day.getDate()).padStart(2,'0');
-    };
-    title = '近7天每日趋势';
+    const today = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    labels = [(d.getMonth()+1) + '月' + d.getDate() + '日'];
+    filterFn = (r, i) => r.date === today;
+    title = '今日趋势';
   } else if (gran === '周') {
     // This week Mon-Sun
     const dayOfWeek = (d.getDay() + 6) % 7;
@@ -762,7 +755,7 @@ async function renderCharts() {
   });
   const catLabels = Object.keys(catMap);
   const catValues = Object.values(catMap);
-  const catTitle = { '日':'近7天支出分类','周':'本周支出分类','月':'本月支出分类','年':'今年支出分类' }[gran];
+  const catTitle = { '日':'今日支出分类','周':'本周支出分类','月':'本月支出分类','年':'今年支出分类' }[gran];
   document.getElementById('chart-category-title').textContent = catTitle;
   const colors = ['#f56c6c','#e6a23c','#409eff','#67c23a','#909399','#b37feb','#5cdbd3','#ff85c0','#ffc069'];
 
@@ -775,7 +768,7 @@ async function renderCharts() {
   });
 
   // Summary table
-  const sumTitle = { '日':'每日汇总','周':'每日汇总','月':'周汇总','年':'月汇总' }[gran];
+  const sumTitle = { '日':'今日汇总','周':'每日汇总','月':'周汇总','年':'月汇总' }[gran];
   const colLabel = { '日':'日期','周':'日期','月':'周','年':'月' }[gran];
   document.getElementById('summary-table-title').textContent = sumTitle;
   document.getElementById('summary-table-head').innerHTML = `<tr><th>${colLabel}</th><th>收入</th><th>支出</th><th>结余</th></tr>`;
