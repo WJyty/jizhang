@@ -917,6 +917,7 @@ document.getElementById('ocr-file-input').addEventListener('change', function(e)
 async function processOCRWithAI(file) {
   const key = getApiKey();
   if (!key) { alert('请先在 🤖 AI 标签页设置 DeepSeek API Key'); return; }
+  console.log('[OCR] Starting, file size:', file.size, 'type:', file.type);
 
   const btn = document.getElementById('btn-ocr-scan');
   const statusEl = document.getElementById('ocr-status');
@@ -925,23 +926,20 @@ async function processOCRWithAI(file) {
   statusEl.style.display = '';
 
   try {
-    // Convert image to base64
     const base64 = await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result.split(',')[1]);
       reader.readAsDataURL(file);
     });
     const mime = file.type || 'image/png';
+    console.log('[OCR] Image encoded, base64 length:', base64.length);
 
-    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'deepseek-v4-flash',
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: `分析这张支付/转账截图。返回JSON格式（只返回JSON，不要其他内容）：
+    const body = {
+      model: 'deepseek-v4-flash',
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: `分析这张支付/转账截图。返回JSON格式（只返回JSON，不要其他内容）：
 {
   "type": "expense 或 income",
   "amount": 数字金额,
@@ -949,34 +947,42 @@ async function processOCRWithAI(file) {
   "date": "YYYY-MM-DD",
   "note": "商家或备注"
 }
+分类：支出类：餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出。收入类：工资、兼职、理财、红包、其他收入。
+根据截图推断分类。金额只提取数字。` },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } }
+        ]
+      }],
+      temperature: 0.1, max_tokens: 300
+    };
 
-分类只能是以下之一：
-支出类：餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出
-收入类：工资、兼职、理财、红包、其他收入
-
-根据截图内容（支付App名称、收款方、商品类型等）推断最合适的分类。
-日期如果有就提取，没有就用今天的日期。
-金额只提取数字。` },
-            { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } }
-          ]
-        }],
-        temperature: 0.1, max_tokens: 300
-      })
+    console.log('[OCR] Sending request...');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify(body),
+      signal: controller.signal
     });
+    clearTimeout(timeout);
+
+    console.log('[OCR] Response status:', resp.status);
+    const respText = await resp.text();
+    console.log('[OCR] Response body (first 500):', respText.substring(0, 500));
 
     if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`API错误 (${resp.status}): ${err.substring(0, 100)}`);
+      throw new Error(`API错误 (${resp.status}): ${respText.substring(0, 200)}`);
     }
 
-    const data = await resp.json();
+    const data = JSON.parse(respText);
     const reply = data.choices[0].message.content;
+    console.log('[OCR] AI reply:', reply);
 
-    // Parse JSON from AI response (handle possible markdown wrapping)
     const jsonMatch = reply.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('AI 未返回有效JSON');
+    if (!jsonMatch) throw new Error('AI 未返回有效JSON: ' + reply.substring(0, 200));
 
     const parsed = JSON.parse(jsonMatch[0]);
+    console.log('[OCR] Parsed:', parsed);
 
     // Fill form
     if (parsed.type === 'income') {
