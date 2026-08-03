@@ -469,7 +469,7 @@ tr:active td { background: #f5f5f5; }
     <div class="ai-setup" id="ai-setup">
       <div class="form-card">
         <div class="form-title">🤖 配置 AI 助手</div>
-        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">输入 DeepSeek API Key，即可用自然语言分析记账数据。Key 仅保存在你的浏览器中。</p>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">输入 API Key 即可使用 AI 功能。Key 仅保存在浏览器本地。</p>
         <div class="form-group" style="margin-bottom:12px">
           <input type="password" id="ai-key-input" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx" style="font-size:13px">
         </div>
@@ -490,10 +490,13 @@ tr:active td { background: #f5f5f5; }
         <input type="text" id="ai-question" placeholder="问点什么..." style="flex:1;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;outline:none">
         <button class="btn btn-primary" id="btn-ai-send" style="width:auto;padding:12px 20px;white-space:nowrap">发送</button>
       </div>
-      <div style="display:flex;gap:8px;justify-content:center">
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
         <button class="btn btn-sm btn-outline" onclick="aiQuickAsk('上个月各项支出分别是多少')">上月支出分布</button>
         <button class="btn btn-sm btn-outline" onclick="aiQuickAsk('哪项支出增长最快')">增长最快</button>
         <button class="btn btn-sm btn-outline" onclick="aiQuickAsk('给我一些省钱建议')">省钱建议</button>
+      </div>
+      <div style="text-align:center;margin-top:12px">
+        <button class="btn btn-sm btn-outline" id="btn-change-key" style="color:var(--text-secondary);font-size:11px">⚙️ 更换 API Key</button>
       </div>
     </div>
   </div>
@@ -890,6 +893,14 @@ document.getElementById('btn-ai-send').addEventListener('click', async () => {
     document.getElementById('ai-chat-area').style.display = '';
   }
 })();
+
+// Change API key
+document.getElementById('btn-change-key').addEventListener('click', () => {
+  document.getElementById('ai-setup').style.display = '';
+  document.getElementById('ai-chat-area').style.display = 'none';
+  document.getElementById('ai-key-input').value = '';
+  document.getElementById('ai-key-input').focus();
+});
 
 // ===== 截图 AI 识别 =====
 document.getElementById('btn-ocr-scan').addEventListener('click', () => {
