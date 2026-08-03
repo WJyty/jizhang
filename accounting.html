@@ -1279,7 +1279,7 @@ async function processOneImage(file, idx, key) {
           role: 'user',
           content: [
             { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
-            { type: 'text', text: `分析这张支付/转账截图，提取所有账单。返回JSON格式（只返回JSON）：{"bills":[{"type":"expense或income","amount":数字,"category":"分类","date":"YYYY-MM-DD","note":"商家名-具体内容"}]}。分类：支出类-餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出。收入类-工资、兼职、理财、红包、其他收入。商家名用简称。` }
+            { type: 'text', text: `分析这张支付/转账截图，提取所有账单。返回JSON格式（只返回JSON）：{"bills":[{"type":"expense或income","amount":数字,"category":"分类","date":"YYYY-MM-DD","note":"商家名-具体内容"}]}。category只能是以下之一：餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出、工资、兼职、理财、红包、其他收入。商家名用简称。` }
           ]
         }],
         temperature: 0.1, max_tokens: 500
