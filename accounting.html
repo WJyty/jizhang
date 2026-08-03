@@ -1084,65 +1084,15 @@ async function processMultipleImages(files) {
   const statusEl = document.getElementById('ocr-status');
   btn.disabled = true;
   statusEl.style.display = '';
+  btn.textContent = '⏳ 并行识别中...';
+  statusEl.innerHTML = '同时分析所有图片...';
 
-  let allBills = [];
   const fileArray = Array.from(files);
-  console.log('[OCR] Processing', fileArray.length, 'images');
+  console.log('[OCR] Parallel', fileArray.length, 'images');
 
-  for (let idx = 0; idx < fileArray.length; idx++) {
-    const file = fileArray[idx];
-    btn.textContent = `⏳ ${idx+1}/${fileArray.length}`;
-    statusEl.innerHTML = `分析第 ${idx+1} 张图片...`;
-
-    try {
-      const base64 = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.readAsDataURL(file);
-      });
-      const mime = file.type || 'image/png';
-
-      const body = {
-        model: AI_MODEL,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
-            { type: 'text', text: `分析这张支付/转账截图，提取所有账单。返回JSON格式（只返回JSON）：{"bills":[{"type":"expense或income","amount":数字,"category":"分类","date":"YYYY-MM-DD","note":"商家名-具体内容"}]}。分类：支出类-餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出。收入类-工资、兼职、理财、红包、其他收入。商家名用简称。` }
-          ]
-        }],
-        temperature: 0.1, max_tokens: 500
-      };
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
-      const resp = await fetch(AI_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
-      clearTimeout(timeout);
-
-      if (!resp.ok) {
-        const txt = await resp.text();
-        throw new Error(`API错误 ${resp.status}: ${txt.substring(0, 100)}`);
-      }
-
-      const data = await resp.json();
-      const reply = data.choices[0].message.content;
-      const jsonMatch = reply.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('未返回有效JSON');
-
-      let parsed = JSON.parse(jsonMatch[0]);
-      const bills = parsed.bills || (parsed.type ? [parsed] : []);
-      console.log(`[OCR] Image ${idx+1}: found ${bills.length} bill(s)`);
-      bills.forEach(b => allBills.push(b));
-
-    } catch (err) {
-      allBills.push({ _error: true, _msg: err.message, note: '识别失败' });
-    }
-  }
+  const results = await Promise.all(fileArray.map((file, idx) => processOneImage(file, idx, key)));
+  const allBills = results.flat();
+  console.log(`[OCR] Done. Total: ${allBills.length}`);
 
   statusEl.style.display = 'none';
   btn.disabled = false;
@@ -1150,10 +1100,8 @@ async function processMultipleImages(files) {
 
   if (!allBills.length) { alert('未识别到任何账单'); return; }
 
-  // Filter out errors
   const valid = allBills.filter(b => !b._error);
   const errors = allBills.filter(b => b._error);
-  console.log(`[OCR] Done. Total: ${allBills.length}, Valid: ${valid.length}, Errors: ${errors.length}`);
   if (errors.length) alert(`${errors.length} 张图片识别失败，已跳过`);
 
   if (valid.length === 1) {
@@ -1164,6 +1112,52 @@ async function processMultipleImages(files) {
     showBillModal(valid);
   } else {
     alert('所有图片均识别失败');
+  }
+}
+
+async function processOneImage(file, idx, key) {
+  try {
+    const base64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(file);
+    });
+    const mime = file.type || 'image/png';
+
+    const resp = await fetch(AI_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: AI_MODEL,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
+            { type: 'text', text: `分析这张支付/转账截图，提取所有账单。返回JSON格式（只返回JSON）：{"bills":[{"type":"expense或income","amount":数字,"category":"分类","date":"YYYY-MM-DD","note":"商家名-具体内容"}]}。分类：支出类-餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出。收入类-工资、兼职、理财、红包、其他收入。商家名用简称。` }
+          ]
+        }],
+        temperature: 0.1, max_tokens: 500
+      }),
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(`API错误 ${resp.status}: ${txt.substring(0, 100)}`);
+    }
+
+    const data = await resp.json();
+    const reply = data.choices[0].message.content;
+    const jsonMatch = reply.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('未返回有效JSON');
+
+    let parsed = JSON.parse(jsonMatch[0]);
+    const bills = parsed.bills || (parsed.type ? [parsed] : []);
+    console.log(`[OCR] Image ${idx+1}: ${bills.length} bill(s)`);
+    return bills;
+  } catch (err) {
+    console.log(`[OCR] Image ${idx+1} failed:`, err.message);
+    return [{ _error: true, _msg: err.message }];
   }
 }
 
