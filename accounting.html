@@ -1193,7 +1193,7 @@ document.getElementById('btn-ai-send').addEventListener('click', async () => {
           { role: 'system', content: `你是记账分析助手。根据用户提供的记账数据回答问题。简洁回复，使用 ¥ 符号表示金额。数据如下：\n\n${summary}` },
           { role: 'user', content: question }
         ],
-        temperature: 0.3, max_tokens: 1000
+        temperature: 0.3, max_tokens: 1000, enable_thinking: false
       })
     });
 
@@ -1323,7 +1323,7 @@ async function processOneImage(file, idx, key) {
             { type: 'text', text: `分析这张支付/转账截图，提取所有消费账单。返回JSON格式（只返回JSON）：{"bills":[{"type":"expense","amount":数字（正数不要负数）,"category":"分类","date":"YYYY-MM-DD","note":"交易对方-商品"}]}。category只能是：餐饮、交通、购物、娱乐、居住、通讯、医疗、教育、其他支出。note格式严格为"商家名-具体购买内容"，如"美团-黄焖鸡米饭"。金额必须是正数。商家名用简称。` }
           ]
         }],
-        temperature: 0.1, max_tokens: 500
+        temperature: 0.1, max_tokens: 500, enable_thinking: false
       }),
       signal: AbortSignal.timeout(60000)
     });
